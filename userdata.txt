@@ -1,0 +1,133 @@
+#!/bin/bash
+set -e  # Exit immediately if a command fails
+
+# Update and upgrade system packages
+sudo apt update -y
+sudo apt upgrade -y
+
+# Install Git
+sudo apt install -y git
+
+# Install Node.js and npm (Using NodeSource)
+curl -fsSL https://deb.nodesource.com/setup_21.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Verify Node.js and npm installation
+node -v
+npm -v
+
+# Install Java 17 (OpenJDK) - Optional if your project requires it
+sudo apt install -y openjdk-17-jdk
+java -version
+
+# Install Nginx
+sudo apt install -y nginx
+
+# Start and enable Nginx to run on boot
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# Clone the GitHub repository for Sowlank
+cd /home/ubuntu
+git clone https://github.com/sakth1x02/Sowlank.git
+
+# Navigate to the frontend directory
+cd /home/ubuntu/Sowlank/Sowalnk
+
+# Install frontend dependencies
+sudo npm install
+
+# Build the frontend
+sudo npm run build
+
+# Install Nodemon globally
+sudo npm install -g nodemon
+
+# Install PM2 globally for process management
+sudo npm install -g pm2
+
+# Set permissions for frontend files
+sudo chmod -R 755 /home/ubuntu/Sowlank
+sudo chown -R ubuntu:ubuntu /home/ubuntu/Sowlank
+
+# Copy the frontend build to the Nginx web root
+sudo cp -r /home/ubuntu/Sowlank/Sowalnk/dist/* /var/www/html/
+
+# Set ownership for the web root
+sudo chown -R www-data:www-data /var/www/html
+
+# Define API URL (Modify this when you have the actual backend API URL)
+BACKEND_API_URL="http://your-backend-api-url"
+
+# Configure Nginx (Main Configuration)
+sudo tee /etc/nginx/nginx.conf > /dev/null <<EOF
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /var/log/nginx/error.log;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+    worker_connections 1024;
+    multi_accept on;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    server_tokens off;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    include /etc/nginx/sites-enabled/*;
+}
+EOF
+
+# Configure Nginx for Frontend Deployment
+sudo tee /etc/nginx/sites-available/default > /dev/null <<EOF
+server {
+    listen 80;
+    server_name sakthidev.site;
+
+    root /var/www/html;
+    index index.html;
+
+    location / {
+        try_files \$uri /index.html;
+    }
+
+    # Proxy API requests to the backend
+    location /api/ {
+        proxy_pass $BACKEND_API_URL;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+
+    error_page 404 /index.html;
+}
+EOF
+
+# Enable the Nginx site configuration
+sudo ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Test Nginx configuration
+sudo nginx -t
+
+# Reload and restart Nginx
+sudo systemctl reload nginx
+sudo systemctl restart nginx
+
+# Print completion message
+echo "✅ Node.js, npm, Java 17, Nginx installed successfully."
+echo "✅ Sowlank frontend has been cloned, dependencies installed, and build completed."
+echo "✅ Nginx is set up for sakthidev.site with backend API at: $BACKEND_API_URL"
