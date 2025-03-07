@@ -16,35 +16,35 @@ sudo systemctl enable nginx
 
 # Define variables
 REPO_URL="https://github.com/sakth1x02/Sowlank.git"
-BRANCH_NAME="main"
+BRANCH_NAME="prod"
 REPO_DIR="/home/ec2-user/Sowlank/Sowlank"
 ENV_FILE="$REPO_DIR/.env"
-APP_TIER_ALB_URL="http://18.209.27.83:2000/"  # Replace with your actual ALB endpoint
+APP_TIER_ALB_URL="http://18.209.27.83:2000/"  # Replace with your actual alb endpoint
 API_URL="/api"
 
 # Clone the repository as ec2-user
 cd /home/ec2-user
 sudo -u ec2-user git clone $REPO_URL
-cd Sowlank
+cd react-node-mysql-app
 
 # Checkout to the specific branch
 sudo -u ec2-user git checkout $BRANCH_NAME
+cd frontend
 
 # Ensure ec2-user owns the directory
-sudo chown -R ec2-user:ec2-user /home/ec2-user/Sowlank
+sudo chown -R ec2-user:ec2-user /home/ec2-user/react-node-mysql-app
 
 # Create .env file with the API_URL
-echo "VITE_API_URL=\"$API_URL\"" | sudo tee "$ENV_FILE" > /dev/null
+echo "VITE_API_URL=\"$API_URL\"" >> "$ENV_FILE"
 
 # Install Node.js dependencies as ec2-user
-cd $REPO_DIR
 sudo -u ec2-user npm install
 
 # Build the frontend application as ec2-user
 sudo -u ec2-user npm run build
 
 # Copy the build files to the NGINX directory
-sudo cp -r dist/* /usr/share/nginx/html/
+sudo cp -r dist /usr/share/nginx/html/
 
 # Update NGINX configuration
 NGINX_CONF="/etc/nginx/nginx.conf"
@@ -90,10 +90,10 @@ sudo tee /etc/nginx/conf.d/presentation-tier.conf > /dev/null <<EOL
 server {
     listen 80;
     server_name $SERVER_NAME;
-    root /usr/share/nginx/html;
+    root /usr/share/nginx/html/dist;
     index index.html index.htm;
 
-    # Health check endpoint
+    #health check
     location /health {
         default_type text/html;
         return 200 "<!DOCTYPE html><p>Health check endpoint</p>\n";
@@ -112,6 +112,7 @@ server {
     }
 }
 EOL
+
 
 # Restart NGINX to apply the new configuration
 sudo systemctl restart nginx
